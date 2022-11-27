@@ -1,12 +1,12 @@
 
-## import data
+# import data
 ped <- read.csv("ped_crashes.csv")
 
-## EDA
+# EDA
 library(qacBase)
 contents(ped)
 
-## drop and rename variables, remove uncoded values, mutate variable types
+# drop and rename variables, remove uncoded values, mutate variable types
 library(dplyr)
 ped <- ped %>% 
   select(-c("Crash.Day","City.or.Township","Party.Type")) %>% #party type only one value
@@ -32,7 +32,7 @@ ped <- ped %>%
   mutate(speedLimit = as.numeric(speedLimit),
          age = as.numeric(age))
   
-## recode time as categorical variable
+# recode time as categorical variable
 morning <- c("6:00 AM - 7:00 AM" ,"7:00 AM - 8:00 AM","8:00 AM - 9:00 AM",
              "9:00 AM - 10:00 AM","10:00 AM - 11:00 AM","11:00 AM - 12:00 noon")
 afternoon <- c("12:00 noon - 1:00 PM","1:00 PM - 2:00 PM","2:00 PM - 3:00 PM",
@@ -49,6 +49,18 @@ ped$time <- ifelse(ped$time %in% morning, "morning",
 df_plot(ped)
 cor_plot(ped)
 
+# recode worstinjury
+ped$worstInjury <- recode(ped$worstInjury, 
+                          "Suspected serious injury (A)" = "4", 
+                          "Suspected minor injury (B)" = "3",
+                          "Possible injury (C)" = "2",
+                          "No injury (O)"  = "1", 
+                          "Fatal injury (K)" = "5")
+
+#recode intersection
+ped$intersection <- recode(ped$intersection, 
+                           "Not intersection crash" = "0", 
+                           "Intersection crash" = "1")
 
 
 
