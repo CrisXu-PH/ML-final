@@ -5,17 +5,8 @@ ped <- read.csv("ped_crashes.csv")
 ## EDA
 library(qacBase)
 contents(ped)
-df_plot(ped)
-cor_plot(ped)
 
-## exclude observations with missing values
-ped <- subset(ped, Weather.Conditions..2016..!="Uncoded & errors")
-# weather uncoded before 2016
-ped <- subset(ped, Person.Gender != "Uncoded & errors")
-ped <- subset(ped, Person.Age != "DOB invalid")
-ped <- na.omit(ped)
-
-## drop and rename variables
+## drop and rename variables, remove uncoded values, mutate variable types
 library(dplyr)
 ped <- ped %>% 
   select(-c("Crash.Day","City.or.Township","Party.Type")) %>% #party type only one value
@@ -29,9 +20,18 @@ ped <- ped %>%
          weather = Weather.Conditions..2016..,
          speedLimit = Speed.Limit.at.Crash.Site,
          worstInjury = Worst.Injury.in.Crash,
-         driver_age = Person.Age,
-         gender = Person.Gender) 
-
+         age = Person.Age,
+         gender = Person.Gender) %>% 
+  filter(weather != "Uncoded & errors",
+         gender != "Uncoded & errors",
+         age != "DOB invalid",
+         age != "Less than 1 year old",
+         light != "Unknown",
+         weather != "Unknown",
+         speedLimit != "Uncoded & errors") %>% 
+  mutate(speedLimit = as.numeric(speedLimit),
+         age = as.numeric(age))
+  
 ## recode time as categorical variable
 morning <- c("6:00 AM - 7:00 AM" ,"7:00 AM - 8:00 AM","8:00 AM - 9:00 AM",
              "9:00 AM - 10:00 AM","10:00 AM - 11:00 AM","11:00 AM - 12:00 noon")
@@ -45,6 +45,11 @@ lateNight <- c("12:00 midnight - 1:00 AM","1:00 AM - 2:00 AM","2:00 AM - 3:00 AM
 ped$time <- ifelse(ped$time %in% morning, "morning",
                    ifelse(ped$time %in% afternoon, "afternoon",
                           ifelse(ped$time %in% night, "night", "midnight")))
+
+df_plot(ped)
+cor_plot(ped)
+
+
 
 
 
