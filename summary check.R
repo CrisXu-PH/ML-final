@@ -1,4 +1,8 @@
+
+## import data
 ped <- read.csv("ped_crashes.csv")
+
+## EDA
 library(qacBase)
 contents(ped)
 df_plot(ped)
