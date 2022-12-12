@@ -69,7 +69,6 @@ barcharts(ped) #unbalanced value for outcome variable hit_run -> need smote, nee
 histograms(ped)
 
 
-# gradient boost
 library(caret)
 set.seed(1234)
 
@@ -83,6 +82,37 @@ train.control <- trainControl(method = "cv",
                               classProbs = TRUE,
                               sampling = "smote")
 
+##################### Basic Logistic Regression ##############
+set.seed(1234)
+model.lr <- train(hit_run ~ ., 
+                  data = train,
+                  trControl = train.control,
+                  method = "glm",
+                  family = "binomial",
+                  metric = "ROC")
+
+##################### Logistic Regressino with Lasso #################
+lambda <- 10^seq(-3, 3, length=100)
+
+set.seed(123)
+model.lasso <- train(
+  hit_run ~., 
+  data = train, 
+  method = "glmnet",
+  metric = "ROC", 
+  family = "binomial",
+  trControl = train.control,
+  tuneGrid = data.frame(alpha = 1, lambda = lambda)
+)
+
+##################### backward selection with AIC ###################
+set.seed(1234)
+model.stepAIC <- train(hit_run ~ ., data=train,
+                       method="glmStepAIC",
+                       trControl = train.control,
+                       metric="ROC",
+                       verbose = FALSE)
+
 ############### stochastic gradient boost ##############
 set.seed(1234)
 model.gbm <- train(hit_run ~.,
@@ -95,7 +125,7 @@ model.gbm <- train(hit_run ~.,
 
 
 
-                   #importance = TRUE) - all ROC metric values are missing
+#importance = TRUE) - all ROC metric values are missing
 
 
 model.gbm$finalModel
@@ -134,9 +164,8 @@ ROC.gbm
 
 library(pROC)
 auc(train$hit_run, train$prob)
+
 ################### extreme gradient boost #####################
-
-
 set.seed(1234)
 model.xgb <- train(hit_run~.,
                    data = train,
@@ -184,13 +213,86 @@ ROC.xgb
 #   manipulate ROC cutoff
 #   compare xgb and gbm
 
+################### Random Forest ###################
+library(randomForest)
+
+set.seed(1234)
+model.rf<-train(hit_run~., 
+                data=train,
+                method='rf',
+                metric='ROC',
+                tuneLength=8,
+                ntree=100,
+                trControl=train.control,
+                importance=TRUE)
+
+##################### ANN ######################
+library(neuralnet)
+set.seed(1234)
+model.ann <- train(hit_run ~ ., 
+                   data=train,
+                   method="nnet",
+                   tuneLength=10,  
+                   metric="ROC",
+                   trControl=train.control,
+                   preProcess=c("range"),
+                   trace=FALSE)
+
+# warning: no variation for weatherFog
+# warning: no variation for weatherSleet/hail
+
+pred <- predict(model.ann, test)
+confusionMatrix(pred, test$hit_run, positive = "yes")
+
 ################### model comparison ##########
 results <- resamples(list(gbm = model.gbm,
-                     xgb = model.xgb))
+                     ann = model.ann,
+                     rf = model.rf,
+                     lasso = model.lasso,
+                     logistic = model.lr,
+                     stepAIC = model.stepAIC
+                     ))
 summary(results)
 bwplot(results)
+dotplot(results)
 
 # compare different models with others
 # after chosen one -> 
 #   fit model -> 
 #   importance = TRUE, adjust ROC cutoff, check gain and lift charts
+
+
+
+
+############### adjust ROC cutoff ################
+train$prob <- predict(model.lasso, train, type="prob")[[2]]
+
+ggplot(train, aes(d=hit_run, m=prob)) +
+  geom_roc(labelround=2, n.cuts=15, labelsize=3) + 
+  style_roc(major.breaks=seq(0, 1, .1),
+            minor.breaks=seq(0, 1, .05),
+            theme=theme_grey) +
+  labs(title="ROC Plot")
+
+library(pROC)
+auc(train$hit_run, train$prob)
+
+# train$pred.12 <- factor(train$prob > 0.07,
+#                         levels = c(FALSE, TRUE),
+#                         labels=c("no", "yes"))
+# train$pred.12
+# str(train$pred.12)
+# str(train$hit_run)
+# confusionMatrix(train$pred.12, 
+#                 train$hit_run, 
+#                 positive="yes")
+
+
+# evaluate on test data
+test$prob <- predict(model.gbm, test, type = "prob")[[2]]
+test$pred.12 <- factor(test$prob > 0.15,
+                       levels = c(FALSE, TRUE),
+                       labels=c("no", "yes"))
+confusionMatrix(test$pred.12, 
+                test$hit_run, 
+                positive="yes")
